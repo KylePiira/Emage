@@ -1,5 +1,5 @@
 # Emage (Encrypt Image Project)
-# v0.3 Alpha - Feb 3, 2017
+# v0.4 Alpha - Feb 4, 2017
 # Copyright (C) 2016-2017 Kyle Piira
 
 import os, hashlib, getpass, binascii, random, simplecrypt
@@ -13,7 +13,8 @@ class Helper:
         return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
     # Convert RGB to Hex codes
-    def rgbToHex(red, green, blue):
+    def rgbToHex(value):
+        red, green, blue = value[:3]
         # Return color as #rrggbb for the given color values
         return '%02x%02x%02x' % (red, green, blue)
 
@@ -23,7 +24,7 @@ class Helper:
         return ''.join(["%s" % random.randint(0, 9) for num in range(0, length)])
 
     # Generate hash from password
-    def passHash(algorthm, password, salt, iters):
+    def passHash(password, salt, iters, algorthm):
         return binascii.hexlify(
                     hashlib.pbkdf2_hmac(
                                     algorthm,
@@ -36,10 +37,12 @@ class Helper:
 class Pixel:
     def __init__(self, color):
         self.isModified = False
+        self.seen = False
         self.color = color
 
-    def changeColor(self, color):
+    def setColor(self, color):
         self.isModified = True
+        self.seen = True
         self.color = color
 
 class Image:
@@ -78,11 +81,30 @@ class Image:
 
         self.img.save(self.imgPath)
 
-def embedImage(img, salt, hash, password, message):
+def encrypt(imgPath, password, message, iters = 1000000, algorthm = 'sha512'):
+    # Initilize Image
+    img = Image()
+    # Open Image
+    img.open(imgPath)
+    # Generate Cryptographic Hex Salt
+    # Salt length must be a multiple of
+    # 6 so that it can fit in Hex codes
+    salt = binascii.hexlify(os.urandom(66))
+    # Hash the password using above salt.
+    passwordHash = Helper.passHash(password, salt, iters, algorthm)
+
+    # Encrypt Message
+    def messageEncrypt(hash, message):
+        key = Helper.genKeyFromHash(32, hash)
+        messageLocked = binascii.hexlify(simplecrypt.encrypt(key, message))
+        return messageLocked
+
+    messageLocked = messageEncrypt(passwordHash, message)
+
     # '000000' is the devider between salt and message.
     embedCode = {
         'salt':str(salt.decode('utf_8')) + '000000',
-        'message':str(message.decode('utf_8'))
+        'message':str(messageLocked.decode('utf_8'))
     }
     n = 6 # Number of chars in each 'byte' of embed code.
     for itr in embedCode:
@@ -93,38 +115,79 @@ def embedImage(img, salt, hash, password, message):
 
     # Make last byte a full 6 chars
     embedCode['message'][-1] = embedCode['message'][-1].zfill(6)
+    embedCode['message'].append('000000')
 
-    for i in range(len(embedCode['salt'])):
-        random.seed(password)
-        img.pixels[random.randint(0, totalPixels)].changeColor(Helper.hexToRGB(embedCode['salt'][i]))
+    def pixelShuffle(img, seed, key, embedCode, totalPixels):
+        random.seed(seed)
+        for i in range(len(embedCode[key])):
+            while True:
+                randIndex = random.randint(0, totalPixels)
+                pixel = img.pixels[randIndex]
+                if not pixel.isModified:
+                    pixel.setColor(Helper.hexToRGB(embedCode[key][i]))
+                    break
 
-    for i in range(len(embedCode['message'])):
-        random.seed(hash)
-        img.pixels[random.randint(0, totalPixels)].changeColor(Helper.hexToRGB(embedCode['message'][i]))
+    # Shuffle the salt into the image
+    pixelShuffle(
+        img,
+        Helper.passHash(password, ''.encode('utf_8'), iters, algorthm),
+        'salt',
+        embedCode,
+        totalPixels
+    )
 
+    # Shuffle the encrypted message into image.
+    pixelShuffle(img, passwordHash, 'message', embedCode, totalPixels)
+
+    # Save the image to disk.
     img.save()
 
-def encrypt(message, password, iters = 1000000, algorthm = 'sha512'):
-    # Generate Cryptographic Hex Salt
-    # Salt length must be a multiple of
-    # 6 so that it can fit in Hex codes
-    salt = binascii.hexlify(os.urandom(66))
-    # Hash the password using above salt.
-    passwordHash = Helper.passHash(algorthm, password, salt, iters)
+def decrypt(imgPath, password, iters = 1000000, algorthm = 'sha512'):
+    # Initilize Image
+    img = Image()
+    # Open Image
+    img.open(imgPath)
+    # Retrieve pixels from image based on Seed
+    def pixelUnshuffle(img, seed, totalPixels):
+        random.seed(seed)
+        pixels = []
+        color = False
+        while color != '000000':
+            while True:
+                randIndex = random.randint(0, totalPixels)
+                try:
+                    pixel = img.pixels[randIndex]
+                except IndexError:
+                    raise Exception('Corrupt file or Incorrect Password')
+                if not pixel.seen:
+                    color = Helper.rgbToHex(pixel.color)
+                    pixels.append(color)
+                    pixel.seen = True
+                    break
+        return pixels
 
-    # Encrypt Message
-    def messageEncrypt(hash, message):
-        key = Helper.genKeyFromHash(32, hash)
-        messageLocked = binascii.hexlify(simplecrypt.encrypt(key, message))
-        return messageLocked
+    # Retrieve the salt
+    salt = ''.join(pixelUnshuffle(
+        img,
+        Helper.passHash(password, ''.encode('utf_8'), iters, algorthm),
+        len(img.pixels)
+    )[:-1]).encode('utf_8')
 
-    messageLocked = messageEncrypt(passwordHash, message)
-
-    return salt, passwordHash, messageLocked
-
-def decrypt(message, password, salt, iters = 1000000, algorthm = 'sha512'):
     # Generate hash using password and salt
-    passwordHash = Helper.passHash(algorthm, password, salt, iters)
+    passwordHash = Helper.passHash(password, salt, iters, algorthm)
+
+    # Retrieve the message (encrypted)
+    message = pixelUnshuffle(
+        img,
+        passwordHash,
+        len(img.pixels)
+    )[:-1]
+
+    # Remove padding from final byte.
+    message[-1] = message[-1].lstrip('0')
+
+    # Convert message to bytes
+    message = ''.join(message).encode('utf_8')
 
     # Decrypt Message
     def messageDecrypt(hash, message):
@@ -132,14 +195,10 @@ def decrypt(message, password, salt, iters = 1000000, algorthm = 'sha512'):
         messageUnlocked = simplecrypt.decrypt(key, binascii.unhexlify(message))
         return messageUnlocked
 
-    messageUnlocked = messageDecrypt(passwordHash, message)
-
-    return messageUnlocked
+    return messageDecrypt(passwordHash, message)
 
 
-message = input('Message: ')
+# message = input('Message: ')
 password = getpass.getpass(prompt='Password: ')
-salt, passHash, message = encrypt(message, password)
-img = Image()
-img.open('Image.png')
-embedImage(img, salt, passHash, password, message)
+# encrypt('Image.png', password, message)
+print(decrypt('Image.png', password))
