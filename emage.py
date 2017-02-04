@@ -2,7 +2,7 @@
 # v0.4 Alpha - Feb 4, 2017
 # Copyright (C) 2016-2017 Kyle Piira
 
-import os, hashlib, getpass, binascii, random, simplecrypt
+import os, hashlib, binascii, random, simplecrypt
 from PIL import Image as PILImage
 
 class Helper:
@@ -155,10 +155,7 @@ def decrypt(imgPath, password, iters = 1000000, algorthm = 'sha512'):
         while color != '000000':
             while True:
                 randIndex = random.randint(0, totalPixels)
-                try:
-                    pixel = img.pixels[randIndex]
-                except IndexError:
-                    raise Exception('Corrupt file or Incorrect Password')
+                pixel = img.pixels[randIndex]
                 if not pixel.seen:
                     color = Helper.rgbToHex(pixel.color)
                     pixels.append(color)
@@ -196,9 +193,3 @@ def decrypt(imgPath, password, iters = 1000000, algorthm = 'sha512'):
         return messageUnlocked
 
     return messageDecrypt(passwordHash, message)
-
-
-# message = input('Message: ')
-password = getpass.getpass(prompt='Password: ')
-# encrypt('Image.png', password, message)
-print(decrypt('Image.png', password))
