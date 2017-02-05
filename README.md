@@ -35,3 +35,4 @@ b'This is a photograph of a penguin'
 >>> 
 ```
 The image penguins.png now has the following text embeded in it: "This is a photograph of a penguin" protected by the password: "password".
+![Penguin](KylePiira/Emage/blob/master/examples/penguins.png?raw=true "Penguin")
