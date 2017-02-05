@@ -54,6 +54,7 @@ class Image:
         self.height = None
 
     def open(self, imgPath):
+        PILImage.MAX_IMAGE_PIXELS = 999999999999 # Fix DecompressionBombWarning (Issue #1)
         self.img = PILImage.open(imgPath)
         self.width, self.height = self.img.size # Store the original size of Image
         self.imgPath = imgPath

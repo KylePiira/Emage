@@ -1,4 +1,4 @@
-from emage import encrypt, decrypt
+from __init__ import encrypt, decrypt
 import getpass, argparse
 
 parser = argparse.ArgumentParser(description='Encrypt or decrypt a message using Emage')
