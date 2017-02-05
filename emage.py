@@ -1,5 +1,5 @@
 # Emage (Encrypt Image Project)
-# v0.4 Alpha - Feb 4, 2017
+# v0.5 Beta - Feb 4, 2017
 # Copyright (C) 2016-2017 Kyle Piira
 
 import os, hashlib, binascii, random, simplecrypt
@@ -79,19 +79,13 @@ class Image:
                 pix[pixel, row] = self.pixels[pixelNum].color
                 pixelNum += 1
 
-        self.img.save(self.imgPath)
+        self.img.save(self.imgPath, "PNG")
 
 def encrypt(imgPath, password, message, iters = 1000000, algorthm = 'sha512'):
     # Initilize Image
     img = Image()
     # Open Image
     img.open(imgPath)
-    # Generate Cryptographic Hex Salt
-    # Salt length must be a multiple of
-    # 6 so that it can fit in Hex codes
-    salt = binascii.hexlify(os.urandom(66))
-    # Hash the password using above salt.
-    passwordHash = Helper.passHash(password, salt, iters, algorthm)
 
     # Encrypt Message
     def messageEncrypt(hash, message):
@@ -99,16 +93,31 @@ def encrypt(imgPath, password, message, iters = 1000000, algorthm = 'sha512'):
         messageLocked = binascii.hexlify(simplecrypt.encrypt(key, message))
         return messageLocked
 
-    messageLocked = messageEncrypt(passwordHash, message)
+    # We are using a while loop to verify that the first character
+    # of the last byte of the encrypted message does not start with
+    # a zero, so that we can pad it with zeros. If it does we will
+    # regenerate it until it no longer does.
+    while True:
+        # Generate Cryptographic Hex Salt
+        # Salt length must be a multiple of
+        # 6 so that it can fit in Hex codes
+        salt = binascii.hexlify(os.urandom(66))
+        # Hash the password using above salt.
+        passwordHash = Helper.passHash(password, salt, iters, algorthm)
 
-    # '000000' is the devider between salt and message.
-    embedCode = {
-        'salt':str(salt.decode('utf_8')) + '000000',
-        'message':str(messageLocked.decode('utf_8'))
-    }
-    n = 6 # Number of chars in each 'byte' of embed code.
-    for itr in embedCode:
-        embedCode[itr] = [embedCode[itr][i:i+n] for i in range(0, len(embedCode[itr]), n)]
+        messageLocked = messageEncrypt(passwordHash, message)
+
+        # '000000' is the devider between salt and message.
+        embedCode = {
+            'salt':str(salt.decode('utf_8')) + '000000',
+            'message':str(messageLocked.decode('utf_8'))
+        }
+        n = 6 # Number of chars in each 'byte' of embed code.
+        for itr in embedCode:
+            embedCode[itr] = [embedCode[itr][i:i+n] for i in range(0, len(embedCode[itr]), n)]
+
+        if embedCode['message'][-1][0] is not '0':
+            break
 
     # Set the total number of pixels
     totalPixels = len(img.pixels)
@@ -181,6 +190,7 @@ def decrypt(imgPath, password, iters = 1000000, algorthm = 'sha512'):
     )[:-1]
 
     # Remove padding from final byte.
+    # print(message)
     message[-1] = message[-1].lstrip('0')
 
     # Convert message to bytes
