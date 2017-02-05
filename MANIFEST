@@ -3,5 +3,4 @@ setup.cfg
 setup.py
 emage/__init__.py
 emage/emage-utility.py
-emage/emage.py
 emage/tests.py
