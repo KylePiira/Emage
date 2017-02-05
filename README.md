@@ -34,5 +34,4 @@ the above will return a bytes object of the string that has been embeded in the 
 b'This is a photograph of a penguin'
 >>> 
 ```
-This image now has the following text embeded in it: "This is a photograph of a penguin" protected by the password: "password".
-![penguins](https://i.imgur.com/JZDW2l0.png)
+The image penguins.png now has the following text embeded in it: "This is a photograph of a penguin" protected by the password: "password".
