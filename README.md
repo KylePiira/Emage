@@ -26,7 +26,6 @@ message = decrypt('/path/to/image/file.png','strongpasswordhere')
 the above will return a bytes object of the string that has been embeded in the image.
 
 # Examples
-![penguins](https://i.imgur.com/JZDW2l0.png)
 ```python
 >>> from emage import encrypt, decrypt
 >>> encrypt('penguins.png','password','This is a photograph of a penguin')
@@ -35,3 +34,5 @@ the above will return a bytes object of the string that has been embeded in the 
 b'This is a photograph of a penguin'
 >>> 
 ```
+This image now has the following text embeded in it: "This is a photograph of a penguin".
+![penguins](https://i.imgur.com/JZDW2l0.png)
