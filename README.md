@@ -13,8 +13,16 @@ then to encrypt some text
 
 to decrypt the text use
 
-`message = decrypt('/path/to/image/file.png'.'strongpasswordhere')`
+`message = decrypt('/path/to/image/file.png','strongpasswordhere')`
 
 the above will return a bytes object of the string that has been embeded in the image.
 
-
+# Examples
+`
+>>> from emage import encrypt, decrypt
+>>> encrypt('penguins.png','password','This is a photograph of a penguin')
+>>> message = decrypt('penguins.png','password')
+>>> message
+b'This is a photograph of a penguin'
+>>> 
+`
